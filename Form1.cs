@@ -12,6 +12,8 @@ namespace DockPanelTest
 {
     public class Drawable
     {
+        public Drawable parent;
+
         public Color color = Color.Red;
         public int margin = 5;
         public int padding = 5;
@@ -43,7 +45,16 @@ namespace DockPanelTest
             //this.height = height;
         }
 
-        public virtual void computeSize() { }
+        //public virtual void computeMaxSize(ref Point maxSize, Point tl, Point br)
+        //{
+        //    if(tl)
+        //}
+
+
+        public void SetParent(Drawable parent)
+        {
+            this.parent = parent;
+        }
     }
 
     public class DockPane : Drawable
@@ -52,9 +63,13 @@ namespace DockPanelTest
 
         public override void Draw(Graphics g)
         {
+            if (parent != null)
+                parent.Draw(g);
+
             base.Draw(g);
             g.DrawString(name, WindowManager.instance.font, Brushes.White, clientX, clientY);
         }
+
     }
 
     public class DocumentContainer : DockPane
@@ -74,16 +89,22 @@ namespace DockPanelTest
     public class DockSplit : Drawable
     {
         public DockSplitDirection direction;
-        public DockPane one, two;
+        public DockPane target, child;
 
         public DockSplit(DockPaneLocation location, DockPane parent, DockPane child)
         {
+            child.width = Math.Max(WindowManager.instance.main.width / 2, child.width);
+            child.height = Math.Max(WindowManager.instance.main.height / 2, child.height);
+            
             margin = 0;
             padding = 0;
             x = parent.x;
             y = parent.y;
             width = parent.width;
             height = parent.height;
+
+            WindowManager.instance.main.width -= child.width;
+            WindowManager.instance.main.height -= child.height;
 
             switch (location)
             {
@@ -97,8 +118,8 @@ namespace DockPanelTest
         public override void Draw(Graphics g)
         {
             base.Draw(g);
-            one.Draw(g);
-            two.Draw(g);
+            target.Draw(g);
+            //child.Draw(g);
         }
 
         private void SplitVertical(DockPane left, DockPane right)
@@ -106,15 +127,15 @@ namespace DockPanelTest
             left.x = clientX;
             left.y = clientY;
             left.height = clientHeight;
-            left.width = clientWidth / 2;
+            //left.width = clientWidth / 2;
 
             right.x =left.x + left.width;
             right.y = clientY;
-            right.width = clientWidth - left.width;
+            //right.width = clientWidth - left.width;
             right.height = clientHeight;
 
-            one = left;
-            two = right;
+            target = left;
+            child = right;
             direction = DockSplitDirection.Vertical;
         }
 
@@ -122,16 +143,16 @@ namespace DockPanelTest
         {
             top.x = clientX;
             top.y = clientY;
-            top.height = clientHeight / 2;
+            //top.height = clientHeight / 2;
             top.width = clientWidth;
 
             bottom.x = clientX;
             bottom.y = top.y + top.height;
             bottom.width = clientWidth;
-            bottom.height = clientHeight - top.height;
+            //bottom.height = clientHeight - top.height;
 
-            one = top;
-            two = bottom;
+            target = top;
+            child = bottom;
             direction = DockSplitDirection.Hortizonal;
         }
 
@@ -144,10 +165,13 @@ namespace DockPanelTest
     {
         public readonly static WindowManager instance = new WindowManager();
 
+        public float widthRatio = 1;
+        public float heightRatio = 1;
+
         public DocumentContainer main = new DocumentContainer() { name = "Main Window" };
 
         //public LinkedList<DockSplit> splits = new LinkedList<DockSplit>();
-        public DockSplit mainSplit;
+        //public DockSplit mainSplit;
 
         public Font font;
         public Brush marginColor;
@@ -156,6 +180,9 @@ namespace DockPanelTest
 
         public Pen borderColor;
         public Pen fontColor;
+
+        private int lastWidth = 0;
+        private int lastHeight = 0;
 
         public void init(Form form)
         {
@@ -168,20 +195,44 @@ namespace DockPanelTest
             //borderColor = new Pen(Color.Orange);
             fontColor = new Pen(Color.White);
 
+            lastWidth = form.ClientRectangle.Width;
+            lastHeight = form.ClientRectangle.Height;
+            main.width = form.ClientRectangle.Width;
+            main.height = form.ClientRectangle.Height;
+
             Resize(form);
         }
 
         public void Draw(Graphics g)
         {
-            mainSplit.Draw(g);
-            //main.Draw(g);
+            //mainSplit.Draw(g);
+            main.Draw(g);
         }
 
         public void Resize(Form form)
         {
-            main.x = 0;
-            main.y = 0;
-            main.width = form.ClientRectangle.Width;
+            //var newWidth = main.width 
+
+            var diffX = form.ClientRectangle.Width - lastWidth;
+            var diffy = form.ClientRectangle.Height - lastHeight;
+
+            var newWidth = main.width + diffX;
+            var newHeight = main.height + diffy;
+            if (newWidth < 100)
+            {
+                newWidth = 100;
+            }
+            else
+            {
+                widthRatio = 1;
+            }
+
+            lastWidth = form.ClientRectangle.Width;
+            lastHeight = form.ClientRectangle.Height;
+
+            //main.x = 0;
+            //main.y = 0;
+            main.width = newWidth;
             main.height = form.ClientRectangle.Height;
         }
 
@@ -196,9 +247,13 @@ namespace DockPanelTest
         public void AddDockPane(DockPane parent, DockPane child, DockPaneLocation location)
         {
             var split = new DockSplit(location, parent, child);
-            
-            if (mainSplit == null)
-                mainSplit = split;
+
+            parent.SetParent(split);
+        }
+
+        public void computeDocumentSize()
+        {
+
         }
     }
 
@@ -207,9 +262,10 @@ namespace DockPanelTest
 
         public Form1()
         {
+            WindowManager.instance.init(this);
+
             InitializeComponent();
 
-            WindowManager.instance.init(this);
 
             var solution = new DockPane() { name = "Solution", width = 250, height = 250 };
             WindowManager.instance.AddDockPane(WindowManager.instance.main, solution, DockPaneLocation.Left);
