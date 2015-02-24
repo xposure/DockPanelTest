@@ -24,7 +24,7 @@ namespace DockPanelTest
 
         public int clientX { get { return x + margin + padding; } }
         public int clientY { get { return y + margin + padding; } }
-        public int clientWidth { get { return  width - padding * 2 - margin * 2; } }
+        public int clientWidth { get { return width - padding * 2 - margin * 2; } }
         public int clientHeight { get { return height - padding * 2 - margin * 2; } }
 
         public bool computed = false;
@@ -45,10 +45,11 @@ namespace DockPanelTest
             //this.height = height;
         }
 
-        //public virtual void computeMaxSize(ref Point maxSize, Point tl, Point br)
-        //{
-        //    if(tl)
-        //}
+        public virtual void computeMaxSize(ref int _width, ref int _height)
+        {
+            if (parent != null)
+                parent.computeMaxSize(ref _width, ref _height);
+        }
 
 
         public void SetParent(Drawable parent)
@@ -69,7 +70,7 @@ namespace DockPanelTest
             base.Draw(g);
             g.DrawString(name, WindowManager.instance.font, Brushes.White, clientX, clientY);
         }
-
+     
     }
 
     public class DocumentContainer : DockPane
@@ -77,6 +78,15 @@ namespace DockPanelTest
         public DocumentContainer()
         {
             computed = true;
+        }
+
+        public override void computeMaxSize(ref int _width, ref int _height)
+        {
+            base.computeMaxSize(ref _width, ref _height);
+
+            width = WindowManager.instance.maxWidth - _width;
+            height = WindowManager.instance.maxHeight - _height;
+
         }
     }
 
@@ -95,7 +105,7 @@ namespace DockPanelTest
         {
             child.width = Math.Max(WindowManager.instance.main.width / 2, child.width);
             child.height = Math.Max(WindowManager.instance.main.height / 2, child.height);
-            
+
             margin = 0;
             padding = 0;
             x = parent.x;
@@ -122,6 +132,17 @@ namespace DockPanelTest
             //child.Draw(g);
         }
 
+        public override void computeMaxSize(ref int _maxWidth, ref int _maxHeight)
+        {
+            if (direction != DockSplitDirection.Hortizonal)
+                _maxWidth += target.width;
+            else
+                _maxHeight += target.height;
+
+            base.computeMaxSize(ref _maxWidth, ref _maxHeight);
+
+        }
+
         private void SplitVertical(DockPane left, DockPane right)
         {
             left.x = clientX;
@@ -129,7 +150,7 @@ namespace DockPanelTest
             left.height = clientHeight;
             //left.width = clientWidth / 2;
 
-            right.x =left.x + left.width;
+            right.x = left.x + left.width;
             right.y = clientY;
             //right.width = clientWidth - left.width;
             right.height = clientHeight;
@@ -156,7 +177,7 @@ namespace DockPanelTest
             direction = DockSplitDirection.Hortizonal;
         }
 
-        
+
     }
 
     public enum DockPaneLocation { Top, Left, Right, Bottom }
@@ -165,8 +186,8 @@ namespace DockPanelTest
     {
         public readonly static WindowManager instance = new WindowManager();
 
-        public float widthRatio = 1;
-        public float heightRatio = 1;
+        public int maxWidth = 0;
+        public int maxHeight = 0;
 
         public DocumentContainer main = new DocumentContainer() { name = "Main Window" };
 
@@ -211,29 +232,37 @@ namespace DockPanelTest
 
         public void Resize(Form form)
         {
-            //var newWidth = main.width 
+            maxWidth = form.ClientRectangle.Width;
+            maxHeight = form.ClientRectangle.Height;
 
-            var diffX = form.ClientRectangle.Width - lastWidth;
-            var diffy = form.ClientRectangle.Height - lastHeight;
+            ////var newWidth = main.width 
 
-            var newWidth = main.width + diffX;
-            var newHeight = main.height + diffy;
-            if (newWidth < 100)
-            {
-                newWidth = 100;
-            }
-            else
-            {
-                widthRatio = 1;
-            }
+            //var diffX = form.ClientRectangle.Width - lastWidth;
+            //var diffy = form.ClientRectangle.Height - lastHeight;
 
-            lastWidth = form.ClientRectangle.Width;
-            lastHeight = form.ClientRectangle.Height;
+            //var newWidth = main.width + diffX;
+            //var newHeight = main.height + diffy;
+           
+            //lastWidth = form.ClientRectangle.Width;
+            //lastHeight = form.ClientRectangle.Height;
 
             //main.x = 0;
             //main.y = 0;
-            main.width = newWidth;
-            main.height = form.ClientRectangle.Height;
+            //main.width = newWidth;
+            //main.height = form.ClientRectangle.Height;
+
+            int _maxWidth = 0;
+            int _maxHeight = 0;
+            main.computeMaxSize(ref _maxWidth, ref _maxHeight);
+
+            //if (_maxHeight == 0) _maxHeight = form.ClientRectangle.Height;
+            //else if (_maxHeight > form.ClientRectangle.Height) return;
+
+            //if (_maxWidth == 0) _maxHeight = form.ClientRectangle.Width;
+            //else if (_maxWidth > form.ClientRectangle.Width) return;
+
+            //main.width = form.ClientRectangle.Width - _maxWidth;
+            //main.height = form.ClientRectangle.Height - _maxHeight;
         }
 
         public DockSplitDirection GetDirection(DockPaneLocation location)
@@ -251,10 +280,8 @@ namespace DockPanelTest
             parent.SetParent(split);
         }
 
-        public void computeDocumentSize()
-        {
+        
 
-        }
     }
 
     public partial class Form1 : Form
@@ -267,7 +294,7 @@ namespace DockPanelTest
             InitializeComponent();
 
 
-            var solution = new DockPane() { name = "Solution", width = 250, height = 250 };
+            var solution = new DockPane() { name = "Solution", width = 250, height = 250, maxWidth = 250, maxHeight = 250 };
             WindowManager.instance.AddDockPane(WindowManager.instance.main, solution, DockPaneLocation.Left);
 
             this.SetStyle(ControlStyles.ResizeRedraw, true);
